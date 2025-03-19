@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Active Alerts Viewer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f8f9fa;
+            text-align: center;
+        }
+        .container {
+            max-width: 900px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .station-group {
+            margin-top: 10px;
+        }
+        .line-box {
+            display: inline-block;
+            padding: 10px;
+            margin: 5px;
+            background: #007bff;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            text-align: left;
+            min-width: 150px;
+            transition: all 0.3s ease;
+        }
+        .line-box:hover {
+            background: #0056b3;
+        }
+        .line-box.active {
+            background: purple;
+            padding: 15px;
+        }
+        .alert-types {
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+        .alert-type {
+            padding: 2px 5px;
+            border-radius: 3px;
+            display: inline-block;
+            margin: 2px 0;
+            color: black;
+            font-weight: bold;
+        }
+        .alert-0 { background: white; }
+        .alert-1, .alert-2 { background: yellow; }
+        .alert-3, .alert-4, .alert-5 { background: orange; }
+        .alert-6, .alert-7, .alert-8, .alert-9, .alert-10 { background: red; color: white; }
+        .alerts-list {
+            display: none;
+            margin-top: 10px;
+            padding: 10px;
+            background: #e9ecef;
+            border-radius: 5px;
+            text-align: left;
+        }
+        .alert {
+            margin-bottom: 15px;
+            padding: 10px;
+            border-bottom: 1px solid #ccc;
+        }
+        .terminal-label {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Active Alerts Viewer</h2>
+        <div class="station-group">
+            <div id="north-lines"></div>
+            <div class="terminal-label">NORTH</div>
+        </div>
+        <hr>
+        <div class="station-group">
+            <div class="terminal-label">SOUTH</div>
+            <div id="south-lines"></div>
+        </div>
+    </div>
+    
+    <script>
+        const API_URL = 'https://api-v3.mbta.com/alerts';
+        const NORTH_LINES = ['CR-Lowell', 'CR-Fitchburg', 'CR-Haverhill', 'CR-Newburyport'];
+        const SOUTH_LINES = ['CR-Needham', 'CR-Fairmount', 'CR-Franklin', 'CR-Greenbush', 'CR-Kingston', 'CR-Middleborough', 'CR-Providence', 'CR-Worcester', 'CR-Foxboro', 'CR-NewBedford'];
+        const ALERT_TYPES = ['Service Change', 'Delay', 'Cancellation', 'Shuttle Bus'];
+        let activeAlert = null;
+
+        function normalizeEffect(effect) {
+            if (!effect) return '';
+            return effect.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
+        }
+
+        async function loadAlerts() {
+            try {
+                const response = await fetch(API_URL);
+                const data = await response.json();
+                console.log('API Response:', data);
+                
+                const alertsByLine = {};
+                [...NORTH_LINES, ...SOUTH_LINES].forEach(line => alertsByLine[line] = { alerts: new Map(), counts: {} });
+                ALERT_TYPES.forEach(type => {
+                    [...NORTH_LINES, ...SOUTH_LINES].forEach(line => alertsByLine[line].counts[type] = 0);
+                });
+                
+                data.data.forEach(alert => {
+                    const alertId = alert.id;
+                    const effect = normalizeEffect(alert.attributes.effect);
+                    
+                    alert.attributes.informed_entity?.forEach(entity => {
+                        if (alertsByLine.hasOwnProperty(entity.route)) {
+                            if (!alertsByLine[entity.route].alerts.has(alertId)) {
+                                alertsByLine[entity.route].alerts.set(alertId, alert);
+                                if (ALERT_TYPES.includes(effect)) {
+                                    alertsByLine[entity.route].counts[effect]++;
+                                }
+                            }
+                        }
+                    });
+                });
+                
+                renderLineBoxes('north-lines', NORTH_LINES, alertsByLine);
+                renderLineBoxes('south-lines', SOUTH_LINES, alertsByLine);
+            } catch (error) {
+                console.error('Error loading alerts:', error);
+            }
+        }
+        
+        function renderLineBoxes(containerId, lines, alertsByLine) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            
+            lines.forEach(line => {
+                const alertCount = alertsByLine[line]?.alerts.size || 0;
+                const counts = alertsByLine[line].counts;
+                
+                const lineBox = document.createElement('div');
+                lineBox.className = 'line-box';
+                lineBox.id = `box-${line}`;
+                lineBox.innerHTML = `${line.replace('CR-', '')} (${alertCount})
+                    <div class="alert-types">
+                        ${ALERT_TYPES.map(type => {
+                            const count = counts[type] || 0;
+                            const colorClass = `alert-${Math.min(count, 10)}`;
+                            return `<span class="alert-type ${colorClass}">${type}: ${count}</span>`;
+                        }).join('<br>')}
+                    </div>`;
+                lineBox.onclick = () => toggleAlerts(line, alertsByLine[line].alerts);
+                
+                const alertList = document.createElement('div');
+                alertList.className = 'alerts-list';
+                alertList.id = `alerts-${line}`;
+                
+                container.appendChild(lineBox);
+                container.appendChild(alertList);
+            });
+        }
+
+        function toggleAlerts(line, alertsMap) {
+            if (activeAlert && activeAlert !== line) {
+                document.getElementById(`alerts-${activeAlert}`).style.display = 'none';
+                document.getElementById(`box-${activeAlert}`).classList.remove('active');
+            }
+            
+            const alertList = document.getElementById(`alerts-${line}`);
+            const lineBox = document.getElementById(`box-${line}`);
+            alertList.innerHTML = '';
+            
+            alertsMap.forEach(alert => {
+                const div = document.createElement('div');
+                div.className = 'alert';
+                div.innerHTML = `<strong>${normalizeEffect(alert.attributes.effect)}:</strong> ${alert.attributes.header}<br>${alert.attributes.description || 'No additional details.'}`;
+                alertList.appendChild(div);
+            });
+            alertList.style.display = alertList.style.display === 'block' ? 'none' : 'block';
+            lineBox.classList.toggle('active');
+            activeAlert = alertList.style.display === 'block' ? line : null;
+        }
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            loadAlerts();
+            setInterval(loadAlerts, 30000);
+        });
+    </script>
+    <footer style="margin-top: 20px; font-size: 0.9em; color: #555;">
+        <span id="last-refresh">Refreshed: </span>
+    </footer>
+    <script>
+        function updateLastRefresh() {
+            document.getElementById('last-refresh').textContent = 'Refreshed: ' + new Date().toLocaleString();
+        }
+        document.addEventListener('DOMContentLoaded', () => {
+            updateLastRefresh();
+            setInterval(() => {
+                loadAlerts();
+                updateLastRefresh();
+            }, 30000);
+        });
+    </script>
+</body>
+</html>
