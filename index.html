@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Active Alerts Viewer</title>
+    <title>Adam's Active Alerts Viewer</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -80,7 +80,7 @@
 </head>
 <body>
     <div class="container">
-        <h2>Active Alerts Viewer</h2>
+        <h2>Adam's Active Alerts Viewer</h2>
         <div class="station-group">
             <div id="north-lines"></div>
             <div class="terminal-label">NORTH</div>
@@ -98,12 +98,12 @@
         const SOUTH_LINES = ['CR-Needham', 'CR-Fairmount', 'CR-Franklin', 'CR-Greenbush', 'CR-Kingston', 'CR-Middleborough', 'CR-Providence', 'CR-Worcester', 'CR-Foxboro', 'CR-NewBedford'];
         const ALERT_TYPES = ['Service Change', 'Delay', 'Cancellation', 'Shuttle Bus'];
         let activeAlert = null;
-
+//standardize alert names
         function normalizeEffect(effect) {
             if (!effect) return '';
             return effect.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
         }
-
+//API fetch + process
         async function loadAlerts() {
             try {
                 const response = await fetch(API_URL);
@@ -138,7 +138,7 @@
                 console.error('Error loading alerts:', error);
             }
         }
-        
+//line box creation        
         function renderLineBoxes(containerId, lines, alertsByLine) {
             const container = document.getElementById(containerId);
             container.innerHTML = '';
@@ -168,7 +168,7 @@
                 container.appendChild(alertList);
             });
         }
-
+//toggles alert box + keeps one open at a time
         function toggleAlerts(line, alertsMap) {
             if (activeAlert && activeAlert !== line) {
                 document.getElementById(`alerts-${activeAlert}`).style.display = 'none';
@@ -189,7 +189,7 @@
             lineBox.classList.toggle('active');
             activeAlert = alertList.style.display === 'block' ? line : null;
         }
-        
+//fetches alerts + add 30 second auto-refresh        
         document.addEventListener('DOMContentLoaded', () => {
             loadAlerts();
             setInterval(loadAlerts, 30000);
@@ -200,7 +200,7 @@
     </footer>
     <script>
         function updateLastRefresh() {
-            document.getElementById('last-refresh').textContent = 'Refreshed: ' + new Date().toLocaleString();
+            document.getElementById('last-refresh').textContent = 'An Adam James Ross Creation | Refreshed: ' + new Date().toLocaleString();
         }
         document.addEventListener('DOMContentLoaded', () => {
             updateLastRefresh();
